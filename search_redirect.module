@@ -10,9 +10,11 @@
  * Implements template_preprocess_search_results().
  */
 function search_redirect_preprocess_search_results(&$variables) {
-  if ($variables['type'] == 'node' && count($variables['results']) == 1) {
+
+  if (count($variables['results']) == 1) {
     drupal_goto($variables['results'][0]['link']);
   }
+
 }
 
 
@@ -20,6 +22,27 @@ function search_redirect_preprocess_search_results(&$variables) {
  * Implements hook_form_alter() for search_admin_settings form.
  */
 function search_redirect_form_search_admin_settings_alter(&$form, $form_state) {
-  dpm($form);
+  $form['search_redirection'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Search redirection'),
+  );
+
+  $form['search_redirection']['search_redirect'] = array(
+    '#type' => 'checkboxes',
+    '#title' => t('Enable redirection for'),
+    '#return_value' => 1,
+    '#options' => array(
+      'node' => t('Single result in node search <em>(will be redirected to node page)</em>'),
+      'user' => t('Single result in user search <em>(will be redirected to user profile)</em>'),
+      'term' => t('Single result for a keyword that exactly matches a term name. <em>(will be redirected to that term page)</em>'),
+      'vocabulary' => t('Single result for a keyword that exactly matches a vocabulary name. <em>(will be redirected to that vocabulary page)</em>'),
+    ),
+    '#default_value' => variable_get('search_redirect_configs', array(
+      'node' => 1,
+      'user' => 1,
+      'term' => 1,
+      'vocabulary' => 1,
+    )),
+  );
 }
 
