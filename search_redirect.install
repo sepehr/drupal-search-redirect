@@ -1,0 +1,23 @@
+<?php
+// $Id$
+
+/**
+ * @file
+ * Search Redirect un/installtion hooks.
+ */
+
+/**
+ * Implements hook_install().
+ */
+function search_redirect_install() {
+
+}
+
+
+/**
+ * Implements hook_uninstall().
+ */
+function search_redirect_uninstall() {
+
+}
+

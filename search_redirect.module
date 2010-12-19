@@ -1,0 +1,23 @@
+<?php
+// $Id$
+
+/**
+ * @file
+ * Contains necessary hook implementations for Search Redirect module.
+ */
+
+/**
+ * Implements template_preprocess_search_results().
+ */
+function search_redirect_preprocess_search_results($variables) {dpm($variables);
+
+}
+
+
+/**
+ * Implements hook_form_alter() for search_admin_settings form.
+ */
+function search_redirect_search_admin_settings_alter(&$form, $form_state) {
+
+}
+
