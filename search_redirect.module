@@ -19,7 +19,7 @@ function search_redirect_preprocess_search_results(&$variables) {
 /**
  * Implements hook_form_alter() for search_admin_settings form.
  */
-function search_redirect_search_admin_settings_alter(&$form, $form_state) {
-
+function search_redirect_form_search_admin_settings_alter(&$form, $form_state) {
+  dpm($form);
 }
 
