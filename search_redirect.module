@@ -18,6 +18,8 @@ function search_redirect_perm() {
  * Implements template_preprocess_search_results().
  */
 function search_redirect_preprocess_search_results(&$variables) {
+  // TODO: Consider user permissions.
+
   // Redirect only if there's no 'noredirect' appended.
   if (isset($_REQUEST['noredirect'])) {
     return;
@@ -32,6 +34,8 @@ function search_redirect_preprocess_search_results(&$variables) {
   ));
 
   // Lookup terms.
+  // TODO: Test, debug.
+  // TODO: Compare lower-cased names.
   if ($configs['term']) {
     $result = db_result(db_query_range("SELECT tid FROM {term_data} WHERE name = '%s'", 0, 1, arg(2)));
     if ($result) {
@@ -83,7 +87,7 @@ function search_redirect_form_search_admin_settings_alter(&$form, $form_state) {
  * Helper function to set a message.
  */
 function search_redirect_set_message() {
-  // TODO: Implement.
+  // TODO: Get params, implement.
   drupal_set_message(t('Haha! you just get redirected.'));
 }
 
