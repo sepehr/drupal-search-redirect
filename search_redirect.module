@@ -7,14 +7,47 @@
  */
 
 /**
+ * Implements hook_perm().
+ */
+function search_redirect_perm() {
+  return array('use search redirection');
+}
+
+
+/**
  * Implements template_preprocess_search_results().
  */
 function search_redirect_preprocess_search_results(&$variables) {
-
-  if (count($variables['results']) == 1) {
-    drupal_goto($variables['results'][0]['link']);
+  // Redirect only if there's no 'noredirect' appended.
+  if (isset($_REQUEST['noredirect'])) {
+    return;
   }
 
+  // Load configs.
+  $configs = variable_get(search_redirect, array(
+    'node' => 1,
+    'user' => 1,
+    'term' => 1,
+    'message' => 1,
+  ));
+
+  // Lookup terms.
+  if ($configs['term']) {
+    $result = db_result(db_query_range("SELECT tid FROM {term_data} WHERE name = '%s'", 0, 1, arg(2)));
+    if ($result) {
+      search_redirect_set_message();
+      drupal_goto(url('taxonomy/term/' . $result->tid));
+      exit();
+    }
+  }
+
+  // If there's just one result.
+  // And it's a node.
+  if (count($variables['results']) == 1 && ($configs['node'] && $variables['type'] == 'node') || ($configs['user'] && $variables['type'] == 'user')) {
+    search_redirect_set_message();
+    drupal_goto($variables['results'][0]['link']);
+    exit();
+  }
 }
 
 
@@ -36,7 +69,7 @@ function search_redirect_form_search_admin_settings_alter(&$form, $form_state) {
       'term' => t('Redirect if the search keyword exactly matches a term name. <em>(to that term page)</em>'),
       'message' => t('Set a message that notifies user that there were a redirection and provide a link to search without redirection.'),
     ),
-    '#default_value' => variable_get('search_redirect_configs', array(
+    '#default_value' => variable_get('search_redirect', array(
       'node' => 1,
       'user' => 1,
       'term' => 1,
