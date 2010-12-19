@@ -24,24 +24,23 @@ function search_redirect_preprocess_search_results(&$variables) {
 function search_redirect_form_search_admin_settings_alter(&$form, $form_state) {
   $form['search_redirection'] = array(
     '#type' => 'fieldset',
-    '#title' => t('Search redirection'),
+    '#title' => t('Redirection settings'),
   );
 
   $form['search_redirection']['search_redirect'] = array(
     '#type' => 'checkboxes',
-    '#title' => t('Enable redirection for'),
     '#return_value' => 1,
     '#options' => array(
-      'node' => t('Single result in node search <em>(will be redirected to node page)</em>'),
-      'user' => t('Single result in user search <em>(will be redirected to user profile)</em>'),
-      'term' => t('Single result for a keyword that exactly matches a term name. <em>(will be redirected to that term page)</em>'),
-      'vocabulary' => t('Single result for a keyword that exactly matches a vocabulary name. <em>(will be redirected to that vocabulary page)</em>'),
+      'node' => t('Redirect if there is a single result in node search <em>(to node page)</em>'),
+      'user' => t('Redirect if there is a single result in user search <em>(to user profile)</em>'),
+      'term' => t('Redirect if the search keyword exactly matches a term name. <em>(to that term page)</em>'),
+      'message' => t('Set a message that notifies user that there were a redirection and provide a link to search without redirection.'),
     ),
     '#default_value' => variable_get('search_redirect_configs', array(
       'node' => 1,
       'user' => 1,
       'term' => 1,
-      'vocabulary' => 1,
+      'message' => 1,
     )),
   );
 }
