@@ -78,3 +78,12 @@ function search_redirect_form_search_admin_settings_alter(&$form, $form_state) {
   );
 }
 
+
+/**
+ * Helper function to set a message.
+ */
+function search_redirect_set_message() {
+  // TODO: Implement.
+  drupal_set_message(t('Haha! you just get redirected.'));
+}
+
