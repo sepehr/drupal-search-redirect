@@ -9,8 +9,10 @@
 /**
  * Implements template_preprocess_search_results().
  */
-function search_redirect_preprocess_search_results($variables) {dpm($variables);
-
+function search_redirect_preprocess_search_results($variables) {
+  if ($variables['type'] == 'node' && count($variables['results']) == 1) {
+    drupal_goto($variables['results'][0]['link']);
+  }
 }
 
 
