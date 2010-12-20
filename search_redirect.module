@@ -18,37 +18,41 @@ function search_redirect_perm() {
  * Implements template_preprocess_search_results().
  */
 function search_redirect_preprocess_search_results(&$variables) {
-  // TODO: Consider user permissions.
-
-  // Redirect only if there's no 'noredirect' appended.
-  if (isset($_REQUEST['noredirect'])) {
+  // Redirect only if there's no 'noredirect'
+  // appended and user has proper permissions.
+  if (isset($_REQUEST['noredirect']) || !user_access('use search redirection')) {
     return;
   }
 
   // Load configs.
   $configs = variable_get(search_redirect, array(
-    'node' => 1,
-    'user' => 1,
-    'term' => 1,
-    'message' => 1,
+    'node' => TRUE,
+    'user' => TRUE,
+    'term' => TRUE,
+    'message' => TRUE,
   ));
 
   // Lookup terms.
-  // TODO: Test, debug.
-  // TODO: Compare lower-cased names.
   if ($configs['term']) {
-    $result = db_result(db_query_range("SELECT tid FROM {term_data} WHERE name = '%s'", 0, 1, arg(2)));
-    if ($result) {
-      search_redirect_set_message();
-      drupal_goto(url('taxonomy/term/' . $result->tid));
+    $tid = db_result(db_query("SELECT tid FROM {term_data} WHERE LOWER(name) = LOWER('%s') LIMIT 1", arg(2)));
+    if ($tid) {
+      // Set a message if set so.
+      if ($configs['message']) {
+        search_redirect_set_message(arg());
+      }
+
+      drupal_goto('taxonomy/term/' . $tid);
       exit();
     }
   }
 
   // If there's just one result.
-  // And it's a node.
   if (count($variables['results']) == 1 && ($configs['node'] && $variables['type'] == 'node') || ($configs['user'] && $variables['type'] == 'user')) {
-    search_redirect_set_message();
+    // Set a message if set so.
+    if ($configs['message']) {
+      search_redirect_set_message(arg());
+    }
+
     drupal_goto($variables['results'][0]['link']);
     exit();
   }
@@ -67,27 +71,43 @@ function search_redirect_form_search_admin_settings_alter(&$form, $form_state) {
   $form['search_redirection']['search_redirect'] = array(
     '#type' => 'checkboxes',
     '#return_value' => 1,
+    '#default_value' => variable_get('search_redirect', array(
+      'node',
+      'user',
+      'term',
+      'message',
+    )),
     '#options' => array(
       'node' => t('Redirect if there is a single result in node search <em>(to node page)</em>'),
       'user' => t('Redirect if there is a single result in user search <em>(to user profile)</em>'),
       'term' => t('Redirect if the search keyword exactly matches a term name. <em>(to that term page)</em>'),
-      'message' => t('Set a message that notifies user that there were a redirection and provide a link to search without redirection.'),
+      'message' => t('Set a message notifying user that there were a redirection. Also provide a link to search without redirection.'),
     ),
-    '#default_value' => variable_get('search_redirect', array(
-      'node' => 1,
-      'user' => 1,
-      'term' => 1,
-      'message' => 1,
-    )),
+  );
+
+  $form['search_redirection']['search_redirect_message'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Redirection message'),
+    '#description' => t('The message which will be shown to user after each search redirection. The link will be appended automatically.'),
+    '#default_value' => variable_get('search_redirect_message', t("You've been redirected from the search results page.")),
   );
 }
 
 
 /**
  * Helper function to set a message.
+ *
+ * @param $args
+ *   Outputed array of arg().
  */
-function search_redirect_set_message() {
-  // TODO: Get params, implement.
-  drupal_set_message(t('Haha! you just get redirected.'));
+function search_redirect_set_message($args) {
+  $message = variable_get('search_redirect_message', t("You've been redirected from the search results page."));
+  $message .= ' ' . t('<a href="!link">Get back to results</a>.', array(
+    '!link' => url(implode('/', $args), array(
+      'query' => 'noredirect',
+    ))
+  ));
+
+  drupal_set_message($message);
 }
 
