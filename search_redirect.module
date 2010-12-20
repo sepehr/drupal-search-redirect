@@ -7,22 +7,6 @@
  */
 
 /**
- * Implements hook_init().
- */
-function search_redirect_init() {
-  // Load configs once per request.
-  $GLOBALS['_search_redirect'] = variable_get('search_redirect', array(
-    'message' => TRUE,
-    'exact_term' => TRUE,
-    'single_node' => TRUE,
-    'single_user' => TRUE,
-    'exact_title' => TRUE,
-    'exact_term_synonym' => TRUE,
-  ));
-}
-
-
-/**
  * Implements hook_perm().
  */
 function search_redirect_perm() {
@@ -34,7 +18,7 @@ function search_redirect_perm() {
  * Implements hook_form_alter() for search_admin_settings form.
  */
 function search_redirect_form_search_admin_settings_alter(&$form, $form_state) {
-  global $_search_redirect;
+  $configs = _search_redirect_configs();
 
   $form['search_redirection'] = array(
     '#type' => 'fieldset',
@@ -44,7 +28,7 @@ function search_redirect_form_search_admin_settings_alter(&$form, $form_state) {
   $form['search_redirection']['search_redirect'] = array(
     '#type' => 'checkboxes',
     '#return_value' => TRUE,
-    '#default_value' => variable_get('search_redirect', array_keys($_search_redirect)),
+    '#default_value' => variable_get('search_redirect', array_keys($configs)),
     '#options' => array(
       'single_node' => t('Redirect if there is a single result in node search <em>(to node page)</em>'),
       'single_user' => t('Redirect if there is a single result in user search <em>(to user profile)</em>'),
@@ -74,10 +58,10 @@ function search_redirect_preprocess_search_results(&$variables) {
   }
 
   // Load configs.
-  global $_search_redirect;
+  $configs = _search_redirect_configs();
 
   // If there's just one result.
-  if (($_search_redirect['single_node'] && $variables['type'] == 'node') || ($_search_redirect['single_user'] && $variables['type'] == 'user')) {
+  if (($configs['single_node'] && $variables['type'] == 'node') || ($configs['single_user'] && $variables['type'] == 'user')) {
     _search_redirect_execute('single_result', '', $variables['results'][0]['link']);
   }
 }
@@ -87,11 +71,11 @@ function search_redirect_preprocess_search_results(&$variables) {
  * Implements hook_form_alter() for various search forms.
  */
 function search_redirect_form_alter(&$form, $form_state, $form_id) {
-  global $_search_redirect;
+  $configs = _search_redirect_configs();
 
   // Realize which form we need to alter.
   $search_forms = array('search_block_form', 'search_theme_form');
-  if ($_search_redirect['advanced_search']) {
+  if ($configs['advanced_search']) {
     $search_forms[] = 'search_form';
   }
 
@@ -110,7 +94,7 @@ function search_redirect_form_alter(&$form, $form_state, $form_id) {
  * searches.
  */
 function search_redirect_form_validate($form, &$form_state) {
-  global $_search_redirect;
+  $configs = _search_redirect_configs();
 
   // Get that keyword.
   switch ($form_state['values']['form_id']) {
@@ -124,7 +108,7 @@ function search_redirect_form_validate($form, &$form_state) {
 
   // Examine different conditions and action.
   foreach (array('exact_term', 'exact_term_synonym', 'exact_title') as $condition) {
-    if ($_search_redirect[$condition]) {
+    if ($configs[$condition]) {
       _search_redirect_execute($condition, $keyword);
     }
   }
@@ -160,7 +144,7 @@ function _search_redirect_set_message($backlink) {
  */
 function _search_redirect_execute($condition, $keyword = '', $path = '') {
   $redirect = FALSE;
-  global $_search_redirect;
+  $configs = _search_redirect_configs();
 
   // Conditional actions.
   switch ($condition) {
@@ -191,7 +175,7 @@ function _search_redirect_execute($condition, $keyword = '', $path = '') {
 
   // Execute redirection if appropriate.
   if ($redirect) {
-    if ($_search_redirect['message']) {
+    if ($configs['message']) {
       _search_redirect_set_message($backlink);
     }
 
@@ -230,5 +214,23 @@ function _search_redirect_query($target, $table, $field, $value) {
   ));
 
   return db_result(db_query($query));
+}
+
+
+/**
+ * Helper function to get configs to have a cleaner code.
+ *
+ * @return
+ *   An array module configs.
+ */
+function _search_redirect_configs() {
+  return variable_get('search_redirect', array(
+    'message' => TRUE,
+    'exact_term' => TRUE,
+    'single_node' => TRUE,
+    'single_user' => TRUE,
+    'exact_title' => TRUE,
+    'exact_term_synonym' => TRUE,
+  ));
 }
 
