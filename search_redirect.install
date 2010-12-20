@@ -20,6 +20,7 @@ function search_redirect_enable() {
  * Implements hook_uninstall().
  */
 function search_redirect_uninstall() {
-
+  variable_del('search_redirect');
+  variable_del('search_redirect_message');
 }
 
