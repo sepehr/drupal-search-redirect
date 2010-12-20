@@ -51,7 +51,7 @@ function search_redirect_form_search_admin_settings_alter(&$form, $form_state) {
       'exact_term' => t('Redirect if the search keyword exactly matches a term name. <em>(to that term page)</em>'),
       'exact_term_synonym' => t('Redirect if the search keyword exactly matches a term synonym. <em>(to that term page)</em>'),
       'exact_title' => t('Redirect if the search keyword exactly matches a node title. <em>(to that node page)</em>'),
-      'advanced_search' => t('Enable the last three features for advances search form, too. <em>(Exact term, synonym or title)</em>'),
+      'advanced_search' => t('Apply the last three features (if enabled) for advanced search form, too. <em>(Exact term, synonym or title)</em>'),
       'message' => t('Set a message notifying user that there were a redirection. Also provide a link to search without redirection.'),
     ),
   );
@@ -217,8 +217,8 @@ function _search_redirect_execute($condition, $keyword = '', $path = '') {
  *   Query result.
  */
 function _search_redirect_query($target, $table, $field, $value) {
-  $query = "SELECT {target} 
-            FROM {{table}} 
+  $query = "SELECT {target}
+            FROM {{table}}
             WHERE LOWER({field}) = LOWER('{value}') LIMIT 1";
 
   // Prepare the query.
