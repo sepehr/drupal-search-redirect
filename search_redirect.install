@@ -7,10 +7,12 @@
  */
 
 /**
- * Implements hook_install().
+ * Implements hook_enable().
  */
-function search_redirect_install() {
-
+function search_redirect_enable() {
+  drupal_set_message(st('Search Redirect has been installed. Please configure its option in <a href="!link">search settings</a> page under <em>Redirection settings</em>.',
+    array('!link' => url('admin/settings/search'))
+  ));
 }
 
 
