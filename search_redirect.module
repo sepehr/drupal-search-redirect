@@ -7,6 +7,22 @@
  */
 
 /**
+ * Implements hook_init().
+ */
+function search_redirect_init() {
+  // Load configs once per request.
+  $GLOBALS['_search_redirect'] = variable_get('search_redirect', array(
+    'message' => TRUE,
+    'exact_term' => TRUE,
+    'single_node' => TRUE,
+    'single_user' => TRUE,
+    'exact_title' => TRUE,
+    'exact_term_synonym' => TRUE,
+  ));
+}
+
+
+/**
  * Implements hook_perm().
  */
 function search_redirect_perm() {
@@ -15,54 +31,11 @@ function search_redirect_perm() {
 
 
 /**
- * Implements template_preprocess_search_results().
- */
-function search_redirect_preprocess_search_results(&$variables) {
-  // Redirect only if there's no 'noredirect'
-  // appended and user has proper permissions.
-  if (isset($_REQUEST['noredirect']) || !user_access('use search redirection')) {
-    return;
-  }
-
-  // Load configs.
-  $configs = variable_get(search_redirect, array(
-    'node' => TRUE,
-    'user' => TRUE,
-    'term' => TRUE,
-    'message' => TRUE,
-  ));
-
-  // Lookup terms.
-  if ($configs['term']) {
-    $tid = db_result(db_query("SELECT tid FROM {term_data} WHERE LOWER(name) = LOWER('%s') LIMIT 1", arg(2)));
-    if ($tid) {
-      // Set a message if set so.
-      if ($configs['message']) {
-        search_redirect_set_message(arg());
-      }
-
-      drupal_goto('taxonomy/term/' . $tid);
-      exit();
-    }
-  }
-
-  // If there's just one result.
-  if (count($variables['results']) == 1 && ($configs['node'] && $variables['type'] == 'node') || ($configs['user'] && $variables['type'] == 'user')) {
-    // Set a message if set so.
-    if ($configs['message']) {
-      search_redirect_set_message(arg());
-    }
-
-    drupal_goto($variables['results'][0]['link']);
-    exit();
-  }
-}
-
-
-/**
  * Implements hook_form_alter() for search_admin_settings form.
  */
 function search_redirect_form_search_admin_settings_alter(&$form, $form_state) {
+  global $_search_redirect;
+
   $form['search_redirection'] = array(
     '#type' => 'fieldset',
     '#title' => t('Redirection settings'),
@@ -70,17 +43,15 @@ function search_redirect_form_search_admin_settings_alter(&$form, $form_state) {
 
   $form['search_redirection']['search_redirect'] = array(
     '#type' => 'checkboxes',
-    '#return_value' => 1,
-    '#default_value' => variable_get('search_redirect', array(
-      'node',
-      'user',
-      'term',
-      'message',
-    )),
+    '#return_value' => TRUE,
+    '#default_value' => variable_get('search_redirect', array_keys($_search_redirect)),
     '#options' => array(
-      'node' => t('Redirect if there is a single result in node search <em>(to node page)</em>'),
-      'user' => t('Redirect if there is a single result in user search <em>(to user profile)</em>'),
-      'term' => t('Redirect if the search keyword exactly matches a term name. <em>(to that term page)</em>'),
+      'single_node' => t('Redirect if there is a single result in node search <em>(to node page)</em>'),
+      'single_user' => t('Redirect if there is a single result in user search <em>(to user profile)</em>'),
+      'exact_term' => t('Redirect if the search keyword exactly matches a term name. <em>(to that term page)</em>'),
+      'exact_term_synonym' => t('Redirect if the search keyword exactly matches a term synonym. <em>(to that term page)</em>'),
+      'exact_title' => t('Redirect if the search keyword exactly matches a node title. <em>(to that node page)</em>'),
+      'advanced_search' => t('Enable the last three features for advances search form, too. <em>(Exact term, synonym or title)</em>'),
       'message' => t('Set a message notifying user that there were a redirection. Also provide a link to search without redirection.'),
     ),
   );
@@ -95,19 +66,169 @@ function search_redirect_form_search_admin_settings_alter(&$form, $form_state) {
 
 
 /**
+ * Implements template_preprocess_search_results().
+ */
+function search_redirect_preprocess_search_results(&$variables) {
+  if (isset($_REQUEST['noredirect']) || count($variables['results']) > 1 || !user_access('use search redirection')) {
+    return;
+  }
+
+  // Load configs.
+  global $_search_redirect;
+
+  // If there's just one result.
+  if (($_search_redirect['single_node'] && $variables['type'] == 'node') || ($_search_redirect['single_user'] && $variables['type'] == 'user')) {
+    _search_redirect_execute('single_result', '', $variables['results'][0]['link']);
+  }
+}
+
+
+/**
+ * Implements hook_form_alter() for various search forms.
+ */
+function search_redirect_form_alter(&$form, $form_state, $form_id) {
+  global $_search_redirect;
+
+  // Realize which form we need to alter.
+  $search_forms = array('search_block_form', 'search_theme_form');
+  if ($_search_redirect['advanced_search']) {
+    $search_forms[] = 'search_form';
+  }
+
+  if (user_access('user search redirection') && in_array($form_id, $search_forms)) {
+    $form['#validate'][] = 'search_redirect_form_validate';
+  }
+}
+
+
+/**
+ * Validation callback for various search forms that deviously redirects!
+ *
+ * Letting us to jump into the workflow before
+ * executing the search. So we got a performance
+ * hit and also the ability to redirect empty-result
+ * searches.
+ */
+function search_redirect_form_validate($form, &$form_state) {
+  global $_search_redirect;
+
+  // Get that keyword.
+  switch ($form_state['values']['form_id']) {
+    case 'search_form':
+      $keyword = $form_state['values']['keys'];
+      break;
+
+    default:
+      $keyword = $form_state['values'][$form_state['values']['form_id']];
+  }
+
+  // Examine different conditions and action.
+  foreach (array('exact_term', 'exact_term_synonym', 'exact_title') as $condition) {
+    if ($_search_redirect[$condition]) {
+      _search_redirect_execute($condition, $keyword);
+    }
+  }
+}
+
+
+/**
  * Helper function to set a message.
  *
- * @param $args
- *   Outputed array of arg().
+ * @param $backlink
+ *   A path to let the user search without redirection.
  */
-function search_redirect_set_message($args) {
+function _search_redirect_set_message($backlink) {
+  $backlink = url($backlink, array('query' => 'noredirect'));
   $message = variable_get('search_redirect_message', t("You've been redirected from the search results page."));
   $message .= ' ' . t('<a href="!link">Get back to results</a>.', array(
-    '!link' => url(implode('/', $args), array(
-      'query' => 'noredirect',
-    ))
+    '!link' => $backlink
   ));
 
   drupal_set_message($message);
+}
+
+
+/**
+ * Helper function to redirect based on passed conditions.
+ *
+ * @param $condition
+ *   The condition we're in.
+ * @param $keyword
+ *   Optional keyword that user has been searched for.
+ * @param $path
+ *   Partial or full path to redirect to.
+ */
+function _search_redirect_execute($condition, $keyword = '', $path = '') {
+  $redirect = FALSE;
+  global $_search_redirect;
+
+  // Conditional actions.
+  switch ($condition) {
+    case 'exact_term':
+    case 'exact_term_synonym':
+      $table = $condition == 'exact_term' ? 'term_data' : 'term_synonym';
+      if ($result = _search_redirect_query('tid', $table, 'name', $keyword)) {
+        $redirect = TRUE;
+        $path = 'taxonomy/term/' . $result;
+      }
+      unset($table);
+      break;
+
+    case 'exact_title':
+      if ($result = _search_redirect_query('nid', 'node', 'title', $keyword)) {
+        $redirect = TRUE;
+        $path = 'node/' . $result;
+      }
+      break;
+
+    case 'single_result':
+      $redirect = TRUE;
+      break;
+  }
+
+  // Set the backlink.
+  $backlink = empty($keyword) ? implode('/', arg()) : 'search/node/' . $keyword;
+
+  // Execute redirection if appropriate.
+  if ($redirect) {
+    if ($_search_redirect['message']) {
+      _search_redirect_set_message($backlink);
+    }
+
+    drupal_goto($path);
+    exit();
+  }
+}
+
+
+/**
+ * Helper function to execute a databse query to examine conditions.
+ *
+ * @param $target
+ *   The target field to select in query.
+ * @param $table
+ *   The table to select from.
+ * @param $field
+ *   The field name to match $value against.
+ * @param $value
+ *   The value to check $field for.
+ *
+ * @return
+ *   Query result.
+ */
+function _search_redirect_query($target, $table, $field, $value) {
+  $query = "SELECT {target} 
+            FROM {{table}} 
+            WHERE LOWER({field}) = LOWER('{value}') LIMIT 1";
+
+  // Prepare the query.
+  $query = strtr($query, array(
+    '{table}' => $table,
+    '{field}' => $field,
+    '{target}' => $target,
+    '{value}' => db_escape_string($value),
+  ));
+
+  return db_result(db_query($query));
 }
 
